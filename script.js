@@ -1,27 +1,40 @@
-// Lista de palavras de 5 letras (sem acentos para simplicidade)
-const lista = [
-  "CARTA", "FELIZ", "AMIGO", "BRISA", "MUNDO",
-  "LIVRO", "JOGAR", "PLANO", "FRETE", "AROMA",
-  "PRAIA", "NAVEG", "SONHO", "FORTE", "LUGAR",
-  "CASAS", "VIVER", "RAIOS", "FUROS", "MAGIA"
-];
+// ---------- utilitários de normalização (remove acentos) ----------
+function normalize(word) {
+  return word
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+}
 
-// Estado do jogo
+// ---------- Vocabulário de exemplo (palavras de 5 letras, pt-BR) ----------
+// Para produção você pode trocar por uma lista maior carregando de arquivo.
+const vocabulario = [
+  "CARTA", "FELIZ", "AMIGO", "BRISA", "MUNDO",
+  "LIVRO", "JOGAR", "PLANO", "MAGIA", "SONHO",
+  "CASAS", "VIVER", "RAIOS", "FORTE", "LUGAR",
+  "SABER", "TRAGO", "FASES", "BOMBA", "FOLHA",
+  "CORES", "FIMES", "VENTO", "TEMPO", "SORTE",
+  "GRAÇA", "NIVEL", "PONTE", "REDEZ", "PAREM" // alguns exemplos adicionais
+].map(w => normalize(w)); // mantemos normalizado internamente
+
+// palavra secreta e estado
 let palavra = "";
 let tentativas = 0;
 const maxTentativas = 6;
 let ganhou = false;
 let chuteAtual = "";
 
+// layout do teclado
 const tecladoLayout = [
   ["Q","W","E","R","T","Y","U","I","O","P"],
   ["A","S","D","F","G","H","J","K","L"],
   ["Enter","Z","X","C","V","B","N","M","←"]
 ];
 
+// escolhe uma palavra secreta aleatória do vocabulário
 function escolhaAleatoria() {
-  const idx = Math.floor(Math.random() * lista.length);
-  return lista[idx];
+  const idx = Math.floor(Math.random() * vocabulario.length);
+  return vocabulario[idx];
 }
 
 function novoJogo() {
@@ -33,10 +46,10 @@ function novoJogo() {
   document.getElementById("status").textContent = "Jogo iniciado! Boa sorte.";
   atualizarDisplay();
   resetTeclado();
-  console.log("Palavra secreta (para dev):", palavra); // pode remover depois
+  console.log("Palavra secreta (para dev):", palavra); // remover em produção
 }
 
-// inicializa teclado visual
+// teclado visual
 function montarTeclado() {
   const container = document.getElementById("keyboard");
   container.innerHTML = "";
@@ -57,13 +70,12 @@ function montarTeclado() {
 }
 
 function resetTeclado() {
-  const all = document.querySelectorAll(".key");
-  all.forEach(k => {
+  document.querySelectorAll(".key").forEach(k => {
     k.classList.remove("certa", "existe", "errada");
   });
 }
 
-// chamada ao clicar em tecla
+// lidar com clique no teclado
 function handleKey(key) {
   if (ganhou || tentativas >= maxTentativas) return;
   if (key === "Enter") {
@@ -78,41 +90,39 @@ function handleKey(key) {
   }
 }
 
-// apagar última letra
 function apagar() {
   if (ganhou || tentativas >= maxTentativas) return;
   chuteAtual = chuteAtual.slice(0, -1);
   atualizarDisplay();
 }
 
-// exibe chute atual no "fake input"
 function atualizarDisplay() {
   const disp = document.getElementById("display-guess");
   disp.textContent = chuteAtual;
 }
 
-// chamada no botão Enter
 function chutar() {
   if (ganhou || tentativas >= maxTentativas) return;
-  if (chuteAtual.length !== 5) {
+
+  const tentativaRaw = chuteAtual.trim();
+  if (tentativaRaw.length !== 5) {
     alert("Digite exatamente 5 letras!");
     return;
   }
-  if (!/^[A-Z]+$/.test(chuteAtual)) {
-    alert("Só letras A-Z (sem acentos).");
+
+  const tentativa = normalize(tentativaRaw);
+
+  // valida no vocabulário
+  if (!vocabulario.includes(tentativa)) {
+    alert("Palavra inválida! Use uma palavra do português.");
     return;
   }
 
   tentativas++;
-  mostrarResultado(chuteAtual);
-  atualizarTeclado(chuteAtual);
+  mostrarResultado(tentativa);
+  atualizarTeclado(tentativa);
   chuteAtual = "";
   atualizarDisplay();
-
-  if (chuteAtual === "" && !ganhou) {
-    // verifique se ganhou ou acabou
-    // (ganhou já seria marcado dentro mostrarResultado)
-  }
 }
 
 function mostrarResultado(tentativa) {
@@ -122,7 +132,7 @@ function mostrarResultado(tentativa) {
   const solArray = palavra.split("");
   const feedback = Array(5).fill("absent");
 
-  // corretas
+  // primeira: corretas
   for (let i = 0; i < 5; i++) {
     if (tentativa[i] === solArray[i]) {
       feedback[i] = "correct";
@@ -130,17 +140,18 @@ function mostrarResultado(tentativa) {
     }
   }
 
-  // presentes
+  // segunda: presentes
   for (let i = 0; i < 5; i++) {
-    if (feedback[i] === "correct") continue;
-    const idx = solArray.indexOf(tentativa[i]);
-    if (idx !== -1) {
-      feedback[i] = "present";
-      solArray[idx] = null;
+    if (feedback[i] !== "correct") {
+      const idx = solArray.indexOf(tentativa[i]);
+      if (idx !== -1) {
+        feedback[i] = "present";
+        solArray[idx] = null;
+      }
     }
   }
 
-  // renderiza
+  // renderiza letras
   for (let i = 0; i < 5; i++) {
     const letraDiv = document.createElement("div");
     letraDiv.classList.add("letra");
@@ -165,7 +176,7 @@ function mostrarResultado(tentativa) {
 
   divResultado.appendChild(linha);
 
-  // status
+  // status de fim
   if (tentativa === palavra) {
     ganhou = true;
     document.getElementById("status").textContent = `🎉 Parabéns! Você acertou em ${tentativas} tentativa(s).`;
@@ -176,7 +187,7 @@ function mostrarResultado(tentativa) {
   }
 }
 
-// atualiza cores do teclado com base nos chutes anteriores
+// atualiza teclado com base no feedback (prioridade: certa > existe > errada)
 function atualizarTeclado(tentativa) {
   const solArray = palavra.split("");
   const feedback = Array(5).fill("absent");
@@ -200,7 +211,7 @@ function atualizarTeclado(tentativa) {
     const letter = tentativa[i];
     const keyEl = document.getElementById(`key-${letter}`);
     if (!keyEl) continue;
-    // prioridade: correct > present > absent
+
     if (feedback[i] === "correct") {
       keyEl.classList.remove("existe", "errada");
       keyEl.classList.add("certa");
@@ -233,6 +244,6 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// inicia
+// inicialização
 montarTeclado();
 novoJogo();
